@@ -36,6 +36,7 @@ rfDf$Average.Sale.To.List <- as.numeric(gsub("\\D", "", rfDf$Average.Sale.To.Lis
 ```
 
 # Data Visualization
+The following graphic shows the median sale price on Redfin and the Case-Shiller Index. Between Jan 2012 and Sep 2018, Case-Shiller index increases around 29% while the median sale price increases around 85%.  This result implies that Redfin data may not be an representative sample of the Chicago housing market for reasons such as: Redfin expanded their representation overtime - therefore, the changes in Redfin's price not only capture the changes of the market but also the changes of Redfin's business itself.
 
 ```{r eda_plot, echo = F}
 require(ggplot2)
@@ -51,4 +52,3 @@ ggplot(pltDf, aes(x = mon, y = value)) + geom_bar(stat = "identity", fill = "#00
   panel.border = element_rect(colour = "grey80", fill = NA)
 ) + ggtitle("Single-Family Housing Price: Redfin vs Case-Shiller Index") + facet_wrap(~variable, ncol = 1, scales = "free_y")
 ```
-
