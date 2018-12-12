@@ -10,51 +10,15 @@ Redfin data center provides monthly real estate information of houses listed on 
 Data Preprocessing
 ==================
 
-This exercise uses Case-Shiller Home Price Index of Chicago downloaded from FRED database using *quantmod* package and Redfin single-family home listing data download from [Redfin Data Center](https://www.redfin.com/blog/data-center).
+This exercise uses Case-Shiller Home Price Index of Chicago downloaded from FRED database using *quantmod* package and Redfin single-family home Chicago listing data downloaded from [Redfin Data Center](https://www.redfin.com/blog/data-center).
 
 ``` r
 # data preprocessing
 require(quantmod)
-```
-
-    ## Loading required package: quantmod
-
-    ## Loading required package: xts
-
-    ## Loading required package: zoo
-
-    ## 
-    ## Attaching package: 'zoo'
-
-    ## The following objects are masked from 'package:base':
-    ## 
-    ##     as.Date, as.Date.numeric
-
-    ## 
-    ## Attaching package: 'xts'
-
-    ## The following objects are masked from 'package:dplyr':
-    ## 
-    ##     first, last
-
-    ## Loading required package: TTR
-
-    ## Version 0.4-0 included new data defaults. See ?getSymbols.
-
-``` r
 require(zoo)
 # download case-shiller housing price index Chicago seasonally adjusted
 getSymbols('CHXRSA', src='FRED')
 ```
-
-    ## 'getSymbols' currently uses auto.assign=TRUE by default, but will
-    ## use auto.assign=FALSE in 0.5-0. You will still be able to use
-    ## 'loadSymbols' to automatically load data. getOption("getSymbols.env")
-    ## and getOption("getSymbols.auto.assign") will still be checked for
-    ## alternate defaults.
-    ## 
-    ## This message is shown once per session and may be disabled by setting 
-    ## options("getSymbols.warning4.0"=FALSE). See ?getSymbols for details.
 
     ## [1] "CHXRSA"
 
@@ -67,23 +31,11 @@ rfDf$Month.of.Period.End <- as.yearmon(rfDf$Month.of.Period.End)
 # process strings into numbers
 rfDf$New.Listings <- as.numeric(gsub(",", "", rfDf$New.Listings))
 rfDf$Inventory <- as.numeric(gsub(",", "", rfDf$Inventory))
-rfDf$Median.Sale.Price <- as.numeric(gsub("\\D", "", rfDf$Median.Sale.Price)) * 1000
+rfDf$Median.Sale.Price <- as.numeric(gsub("\\D", "", rfDf$Median.Sale.Price))
 rfDf$Average.Sale.To.List <- as.numeric(gsub("\\D", "", rfDf$Average.Sale.To.List)) * 0.001
 ```
 
-``` r
-require(ggplot2)
-df <- as.data.frame(CHXRSA)
-df$mon <- as.yearmon(row.names(df))
-
-pltDf <- merge(df, rfDf, by.x = "mon", by.y = "Month.of.Period.End")
-
-p1 <- ggplot(pltDf, aes(x = mon, y = Median.Sale.Price/1000)) + geom_bar(stat = "identity", fill = "#00a0dc") + expand_limits(y = 0) + scale_x_yearmon(breaks =  scales::pretty_breaks(n = 4)) + xlab("") + ylab("Median Sale Price ($K)") + theme(
-  panel.background = element_blank(),
-  panel.grid.major.y = element_line(colour = "grey80"),
-  panel.border = element_rect(colour = "grey80", fill = NA)
-) + ggtitle("RedFin Single-Family Housing Sale Price")
-print(p1)
-```
+Data Visualization
+==================
 
 ![](predict-case-shiller-index_files/figure-markdown_github/eda_plot-1.png)

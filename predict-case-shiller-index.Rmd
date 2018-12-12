@@ -15,9 +15,9 @@ rm(list = ls())
 redfin <- read.csv("~/working_datasets/redfin/data_crosstab-chicago-asof-201812.csv", fileEncoding = "UCS-2LE", sep = "\t")
 ```
 # Data Preprocessing
-This exercise uses Case-Shiller Home Price Index of Chicago downloaded from FRED database using _quantmod_ package and Redfin single-family home listing data download from [Redfin Data Center](https://www.redfin.com/blog/data-center).
+This exercise uses Case-Shiller Home Price Index of Chicago downloaded from FRED database using _quantmod_ package and Redfin single-family home Chicago listing data downloaded from [Redfin Data Center](https://www.redfin.com/blog/data-center).
 
-```{r data}
+```{r data, message = F}
 # data preprocessing
 require(quantmod)
 require(zoo)
@@ -31,21 +31,24 @@ rfDf$Month.of.Period.End <- as.yearmon(rfDf$Month.of.Period.End)
 # process strings into numbers
 rfDf$New.Listings <- as.numeric(gsub(",", "", rfDf$New.Listings))
 rfDf$Inventory <- as.numeric(gsub(",", "", rfDf$Inventory))
-rfDf$Median.Sale.Price <- as.numeric(gsub("\\D", "", rfDf$Median.Sale.Price)) * 1000
+rfDf$Median.Sale.Price <- as.numeric(gsub("\\D", "", rfDf$Median.Sale.Price))
 rfDf$Average.Sale.To.List <- as.numeric(gsub("\\D", "", rfDf$Average.Sale.To.List)) * 0.001
 ```
 
-```{r eda_plot}
+# Data Visualization
+
+```{r eda_plot, echo = F}
 require(ggplot2)
 df <- as.data.frame(CHXRSA)
 df$mon <- as.yearmon(row.names(df))
 
-pltDf <- merge(df, rfDf, by.x = "mon", by.y = "Month.of.Period.End")
+pltDf <- melt(subset(merge(df, rfDf, by.x = "mon", by.y = "Month.of.Period.End"), select = c("mon", "Median.Sale.Price", "CHXRSA")), id = "mon")
+levels(pltDf$variable) <- c("Median Sale Price", "Case-Shiller Home Price Index")
 
-p1 <- ggplot(pltDf, aes(x = mon, y = Median.Sale.Price/1000)) + geom_bar(stat = "identity", fill = "#00a0dc") + expand_limits(y = 0) + scale_x_yearmon(breaks =  scales::pretty_breaks(n = 4)) + xlab("") + ylab("Median Sale Price ($K)") + theme(
+ggplot(pltDf, aes(x = mon, y = value)) + geom_bar(stat = "identity", fill = "#00a0dc") + expand_limits(y = 0) + scale_x_yearmon(breaks =  scales::pretty_breaks(n = 4)) + xlab("") + ylab("Case-Shiller Index / Median Sale Price ($K)") + theme(
   panel.background = element_blank(),
   panel.grid.major.y = element_line(colour = "grey80"),
   panel.border = element_rect(colour = "grey80", fill = NA)
-) + ggtitle("RedFin Single-Family Housing Sale Price")
-print(p1)
+) + ggtitle("Single-Family Housing Price: Redfin vs Case-Shiller Index") + facet_wrap(~variable, ncol = 1, scales = "free_y")
 ```
+
