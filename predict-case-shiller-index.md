@@ -136,7 +136,10 @@ out <- rep(0, nrow(modDf) -3 - 60 + 1)
 for(k in 60:(nrow(modDf) - 3)) {
     train <- modDf[(k-59):k, ]
     test <- modDf[(k+1):(k+3), ]
-    mod <- Arima(train$logCHXRSA, xreg = train$logmsp, order = c(2, 1, 2), seasonal = list(period = 1, order = c(0, 0, 0)), include.drift  =T) 
+    mod <- Arima(train$logCHXRSA, xreg = train$logmsp, 
+                 order = c(2, 1, 2), 
+                 seasonal = list(period = 1, order = c(0, 0, 0)), 
+                 include.drift  =T) 
     pred <- predict(mod, newxreg = test$logmsp)$pred[, 1]
     out[k-59] <- mean((pred - test$logCHXRSA)^2)
 }
@@ -145,4 +148,4 @@ print(paste("rmse:", round(mean(out), 2)))
 
     ## [1] "rmse: 0.02"
 
-The root mean squared logarithm error of this model is 0.02.
+The root mean squared logarithm error of this model is 0.02. However, the model consistently underforecast the actuals.

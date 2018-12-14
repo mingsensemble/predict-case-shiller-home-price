@@ -38,7 +38,7 @@ rfDf$Average.Sale.To.List <- as.numeric(gsub("\\D", "", rfDf$Average.Sale.To.Lis
 # Data Visualization
 The following graphic shows the median sale price on Redfin and the Case-Shiller Index. Between Jan 2012 and Sep 2018, Case-Shiller index increases around 29% while the median sale price increases around 85%.  This result implies that Redfin data may not be an representative sample of the Chicago housing market for reasons such as: Redfin expanded their representation overtime - therefore, the changes in Redfin's price not only capture the changes of the market but also the changes of Redfin's business itself.
 
-```{r eda_plot, echo = F}
+```{r eda_plot, echo = F, fig.width = 6, fig.height = 6}
 require(ggplot2)
 df <- as.data.frame(CHXRSA)
 df$mon <- as.yearmon(row.names(df))
@@ -85,10 +85,13 @@ out <- rep(0, nrow(modDf) -3 - 60 + 1)
 for(k in 60:(nrow(modDf) - 3)) {
     train <- modDf[(k-59):k, ]
     test <- modDf[(k+1):(k+3), ]
-    mod <- Arima(train$logCHXRSA, xreg = train$logmsp, order = c(2, 1, 2), seasonal = list(period = 1, order = c(0, 0, 0)), include.drift  =T) 
+    mod <- Arima(train$logCHXRSA, xreg = train$logmsp, 
+                 order = c(2, 1, 2), 
+                 seasonal = list(period = 1, order = c(0, 0, 0)), 
+                 include.drift  =T) 
     pred <- predict(mod, newxreg = test$logmsp)$pred[, 1]
     out[k-59] <- mean((pred - test$logCHXRSA)^2)
 }
 print(paste("rmse:", round(mean(out), 2)))
 ```
-The root mean squared logarithm error of this model is `r round(mean(out), 2)`.
+The root mean squared logarithm error of this model is `r round(mean(out), 2)`.  However, the model consistently underforecast the actuals.
