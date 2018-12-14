@@ -46,9 +46,49 @@ df$mon <- as.yearmon(row.names(df))
 pltDf <- melt(subset(merge(df, rfDf, by.x = "mon", by.y = "Month.of.Period.End"), select = c("mon", "Median.Sale.Price", "CHXRSA")), id = "mon")
 levels(pltDf$variable) <- c("Median Sale Price", "Case-Shiller Home Price Index")
 
-ggplot(pltDf, aes(x = mon, y = value)) + geom_bar(stat = "identity", fill = "#00a0dc") + expand_limits(y = 0) + scale_x_yearmon(breaks =  scales::pretty_breaks(n = 4)) + xlab("") + ylab("Case-Shiller Index / Median Sale Price ($K)") + theme(
+ggplot(pltDf, aes(x = mon, y = value)) + geom_line(colour = "#00a0dc") + expand_limits(y = 0) + scale_x_yearmon(breaks =  scales::pretty_breaks(n = 4)) + xlab("") + ylab("Case-Shiller Index / Median Sale Price ($K)") + theme(
   panel.background = element_blank(),
   panel.grid.major.y = element_line(colour = "grey80"),
   panel.border = element_rect(colour = "grey80", fill = NA)
 ) + ggtitle("Single-Family Housing Price: Redfin vs Case-Shiller Index") + facet_wrap(~variable, ncol = 1, scales = "free_y")
 ```
+
+# Empirical Strategy
+We can think of Case-Shiller index as a function of Redfin data where the disturbance term captures the changes in Redfin's business.  This assumption implies the use of the ARIMAX model, where we allow the disturbance term to have AR or MA structure.
+
+```{r train-data, echo = T}
+modDf <- merge(df, rfDf, by.x = "mon", by.y = "Month.of.Period.End")
+modDf$logCHXRSA <- log(modDf$CHXRSA)
+modDf$logmsp <- log(modDf$Median.Sale.Price)
+```
+
+Use Hyndman-Khandakar algorithm to determine the order:
+```{r}
+require(forecast)
+fit <- auto.arima(modDf$logCHXRSA, xreg = modDf$logmsp, allowdrift = T)
+summary(fit)
+```
+## Residual Diagnostics
+```{r}
+# Box-Ljung Serial Correlation Test
+Box.test(resid(fit)) # Pass!
+# Augmented Dickey-Fuller Test
+require(tseries) 
+adf.test(resid(fit)) # On the margin
+# Shapiro Normaliry Test
+shapiro.test(resid(fit)) # Fail
+```
+## Cross-Validation
+Cross-validation is conducted by estimating training data with 60 months and predict the next three month.
+```{r}
+out <- rep(0, nrow(modDf) -3 - 60 + 1)
+for(k in 60:(nrow(modDf) - 3)) {
+    train <- modDf[(k-59):k, ]
+    test <- modDf[(k+1):(k+3), ]
+    mod <- Arima(train$logCHXRSA, xreg = train$logmsp, order = c(2, 1, 2), seasonal = list(period = 1, order = c(0, 0, 0)), include.drift  =T) 
+    pred <- predict(mod, newxreg = test$logmsp)$pred[, 1]
+    out[k-59] <- mean((pred - test$logCHXRSA)^2)
+}
+print(paste("rmse:", round(mean(out), 2)))
+```
+The root mean squared logarithm error of this model is `r round(mean(out), 2)`.
