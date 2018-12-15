@@ -151,4 +151,4 @@ ggplot(melt(subset(cbind(test, pred), select = c("mon", "logCHXRSA", "pred")), i
 ) + xlab("Month") + ylab("Actual vs Predicted Case-Shiller") + ggtitle("12-Month Out-of-Sample Testing")
 ```
 
-![](predict-case-shiller-index_files/figure-markdown_github/unnamed-chunk-5-1.png)
+![](predict-case-shiller-index_files/figure-markdown_github/unnamed-chunk-5-1.png) \# Concluding Remarks The key limitation of this model is that predictions completely rely on a linear time trend and the difference between Redfin median price of the predicted month and the first month. The coefficient of the difference suggests a "reversion" effect: when the median price differs from the first month by a larger extent, this variable will lower the effect of the linear time trend more. The model performs well out of sample when we only predict 3 months forward. However, the long-term forecasts consistently lie below the actuals. A more sophisticated approach, such as a recurrent neural network, is worth future exploration.
