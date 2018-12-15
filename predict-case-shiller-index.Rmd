@@ -53,7 +53,7 @@ ggplot(pltDf, aes(x = mon, y = value)) + geom_line(colour = "#00a0dc") + expand_
 ) + ggtitle("Single-Family Housing Price: Redfin vs Case-Shiller Index") + facet_wrap(~variable, ncol = 1, scales = "free_y")
 ```
 
-# Empirical Strategy
+# Empirical Strategy: Linear Model with ARIMA Error
 We can think of Case-Shiller index as a function of Redfin data where the disturbance term captures the changes in Redfin's business.  This assumption implies the use of the ARIMAX model, where we allow the disturbance term to have AR or MA structure.
 
 ```{r train-data, echo = T}
@@ -68,15 +68,23 @@ require(forecast)
 fit <- auto.arima(modDf$logCHXRSA, xreg = modDf$logmsp, allowdrift = T)
 summary(fit)
 ```
+The algorithm suggests a regression with arima(2, 1, 2) error:
+
+$\Delta y_{t} = \beta_{0} + \beta_{1} \Delta x_{t} + u_{t}$
+
+$u_{t} = \rho_{1} u_{t-1} + \rho_{2} u_{t-2} + \epsilon_{t} + \gamma_{1} \epsilon_{t-1} + \gamma_{2} \epsilon_{t-2}$
+
+$\epsilon_t \sim N(0, \sigma)$
+
+By iteratively replacing $y_t$ with previous $y_t$, the model can be rewritten as:
+
+$y_t = y_0 + \beta_0 \cdot t + \beta_1 (x_t - x_0) + \sum_j u_j$
+
 ## Residual Diagnostics
+I implement the Box-Ljung Test to test whether the residuals are white noises.
 ```{r}
 # Box-Ljung Serial Correlation Test
 Box.test(resid(fit)) # Pass!
-# Augmented Dickey-Fuller Test
-require(tseries) 
-adf.test(resid(fit)) # On the margin
-# Shapiro Normaliry Test
-shapiro.test(resid(fit)) # Fail
 ```
 ## Cross-Validation
 Cross-validation is conducted by estimating training data with 60 months and predict the next three month.
@@ -89,9 +97,26 @@ for(k in 60:(nrow(modDf) - 3)) {
                  order = c(2, 1, 2), 
                  seasonal = list(period = 1, order = c(0, 0, 0)), 
                  include.drift  =T) 
-    pred <- predict(mod, newxreg = test$logmsp)$pred[, 1]
+    pred <- modDf$logCHXRSA[1] + coef(mod)['drift'] * ((k + 1):(k + 3)) + coef(mod)['train$logmsp'] * (test$logmsp - modDf$logmsp[1])
+    # use y0 + b0 * t + b1 * (xt - x0) to handle drift
     out[k-59] <- mean((pred - test$logCHXRSA)^2)
 }
 print(paste("rmse:", round(mean(out), 2)))
 ```
-The root mean squared logarithm error of this model is `r round(mean(out), 2)`.  However, the model consistently underforecast the actuals.
+The root mean squared logarithm error of this model is `r round(mean(out), 2)`.
+```{r fig.width = 6, fig.height = 4}
+train <- modDf[1:(nrow(modDf) - 12), ]
+test <- modDf[((nrow(modDf) - 11) : nrow(modDf)), ]
+fit <- Arima(train$logCHXRSA, xreg = train$logmsp, 
+             order = c(2, 1, 2), 
+             seasonal = list(period = 1, order = c(0, 0, 0)), 
+             include.drift  =T) 
+pred <- modDf$logCHXRSA[1] + coef(mod)['drift'] * (((nrow(modDf) - 11) : nrow(modDf))) + coef(mod)['train$logmsp'] * (test$logmsp - modDf$logmsp[1])
+ggplot(melt(subset(cbind(test, pred), select = c("mon", "logCHXRSA", "pred")), id = "mon"), aes(x = as.Date(mon), y = value)) + geom_line(aes(colour = variable)) + theme(
+  panel.background = element_blank(),
+  panel.grid.major.y = element_line(colour = "grey80"),
+  panel.border = element_rect(colour = "grey80", fill = NA)
+) + xlab("Month") + ylab("Actual vs Predicted Case-Shiller") + ggtitle("12-Month Out-of-Sample Testing")
+```
+# Empirical Strategy: Dynamic Linear Model
+Alternatively, we can rely more on the "momentum" of Redfin prices to predict Case-Shiller index.  A autogressive distributed lag model is applicable.

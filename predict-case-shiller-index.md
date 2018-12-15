@@ -42,8 +42,8 @@ The following graphic shows the median sale price on Redfin and the Case-Shiller
 
 ![](predict-case-shiller-index_files/figure-markdown_github/eda_plot-1.png)
 
-Empirical Strategy
-==================
+Empirical Strategy: Linear Model with ARIMA Error
+=================================================
 
 We can think of Case-Shiller index as a function of Redfin data where the disturbance term captures the changes in Redfin's business. This assumption implies the use of the ARIMAX model, where we allow the disturbance term to have AR or MA structure.
 
@@ -83,8 +83,22 @@ summary(fit)
     ##                   MASE        ACF1
     ## Training set 0.6344225 -0.02725734
 
+The algorithm suggests a regression with arima(2, 1, 2) error:
+
+*Δ**y*<sub>*t*</sub> = *β*<sub>0</sub> + *β*<sub>1</sub>*Δ**x*<sub>*t*</sub> + *u*<sub>*t*</sub>
+
+*u*<sub>*t*</sub> = *ρ*<sub>1</sub>*u*<sub>*t* − 1</sub> + *ρ*<sub>2</sub>*u*<sub>*t* − 2</sub> + *ϵ*<sub>*t*</sub> + *γ*<sub>1</sub>*ϵ*<sub>*t* − 1</sub> + *γ*<sub>2</sub>*ϵ*<sub>*t* − 2</sub>
+
+*ϵ*<sub>*t*</sub> ∼ *N*(0, *σ*)
+
+By iteratively replacing *y*<sub>*t*</sub> with previous *y*<sub>*t*</sub>, the model can be rewritten as:
+
+*y*<sub>*t*</sub> = *y*<sub>0</sub> + *β*<sub>0</sub> ⋅ *t* + *β*<sub>1</sub>(*x*<sub>*t*</sub> − *x*<sub>0</sub>)+∑<sub>*j*</sub>*u*<sub>*j*</sub>
+
 Residual Diagnostics
 --------------------
+
+I implement the Box-Ljung Test to test whether the residuals are white noises.
 
 ``` r
 # Box-Ljung Serial Correlation Test
@@ -96,35 +110,6 @@ Box.test(resid(fit)) # Pass!
     ## 
     ## data:  resid(fit)
     ## X-squared = 0.06018, df = 1, p-value = 0.8062
-
-``` r
-# Augmented Dickey-Fuller Test
-require(tseries) 
-```
-
-    ## Loading required package: tseries
-
-``` r
-adf.test(resid(fit)) # On the margin
-```
-
-    ## 
-    ##  Augmented Dickey-Fuller Test
-    ## 
-    ## data:  resid(fit)
-    ## Dickey-Fuller = -3.1407, Lag order = 4, p-value = 0.1087
-    ## alternative hypothesis: stationary
-
-``` r
-# Shapiro Normaliry Test
-shapiro.test(resid(fit)) # Fail
-```
-
-    ## 
-    ##  Shapiro-Wilk normality test
-    ## 
-    ## data:  resid(fit)
-    ## W = 0.90842, p-value = 2.527e-05
 
 Cross-Validation
 ----------------
@@ -140,12 +125,30 @@ for(k in 60:(nrow(modDf) - 3)) {
                  order = c(2, 1, 2), 
                  seasonal = list(period = 1, order = c(0, 0, 0)), 
                  include.drift  =T) 
-    pred <- predict(mod, newxreg = test$logmsp)$pred[, 1]
+    pred <- modDf$logCHXRSA[1] + coef(mod)['drift'] * ((k + 1):(k + 3)) + coef(mod)['train$logmsp'] * (test$logmsp - modDf$logmsp[1])
+    # use y0 + b0 * t + b1 * (xt - x0) to handle drift
     out[k-59] <- mean((pred - test$logCHXRSA)^2)
 }
 print(paste("rmse:", round(mean(out), 2)))
 ```
 
-    ## [1] "rmse: 0.02"
+    ## [1] "rmse: 0"
 
-The root mean squared logarithm error of this model is 0.02. However, the model consistently underforecast the actuals.
+The root mean squared logarithm error of this model is 0.
+
+``` r
+train <- modDf[1:(nrow(modDf) - 12), ]
+test <- modDf[((nrow(modDf) - 11) : nrow(modDf)), ]
+fit <- Arima(train$logCHXRSA, xreg = train$logmsp, 
+             order = c(2, 1, 2), 
+             seasonal = list(period = 1, order = c(0, 0, 0)), 
+             include.drift  =T) 
+pred <- modDf$logCHXRSA[1] + coef(mod)['drift'] * (((nrow(modDf) - 11) : nrow(modDf))) + coef(mod)['train$logmsp'] * (test$logmsp - modDf$logmsp[1])
+ggplot(melt(subset(cbind(test, pred), select = c("mon", "logCHXRSA", "pred")), id = "mon"), aes(x = as.Date(mon), y = value)) + geom_line(aes(colour = variable)) + theme(
+  panel.background = element_blank(),
+  panel.grid.major.y = element_line(colour = "grey80"),
+  panel.border = element_rect(colour = "grey80", fill = NA)
+) + xlab("Month") + ylab("Actual vs Predicted Case-Shiller") + ggtitle("12-Month Out-of-Sample Testing")
+```
+
+![](predict-case-shiller-index_files/figure-markdown_github/unnamed-chunk-5-1.png) \# Empirical Strategy: Dynamic Linear Model Alternatively, we can rely more on the "momentum" of Redfin prices to predict Case-Shiller index. A autogressive distributed lag model is applicable.
