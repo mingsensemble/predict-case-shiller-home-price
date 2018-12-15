@@ -101,9 +101,9 @@ for(k in 60:(nrow(modDf) - 3)) {
     # use y0 + b0 * t + b1 * (xt - x0) to handle drift
     out[k-59] <- mean((pred - test$logCHXRSA)^2)
 }
-print(paste("rmse:", round(mean(out), 2)))
+print(paste("rmse:", round(mean(out), 4)))
 ```
-The root mean squared logarithm error of this model is `r round(mean(out), 2)`.
+The root mean squared logarithm error of this model is `r round(mean(out), 4)`.
 ```{r fig.width = 6, fig.height = 4}
 train <- modDf[1:(nrow(modDf) - 12), ]
 test <- modDf[((nrow(modDf) - 11) : nrow(modDf)), ]
@@ -118,5 +118,3 @@ ggplot(melt(subset(cbind(test, pred), select = c("mon", "logCHXRSA", "pred")), i
   panel.border = element_rect(colour = "grey80", fill = NA)
 ) + xlab("Month") + ylab("Actual vs Predicted Case-Shiller") + ggtitle("12-Month Out-of-Sample Testing")
 ```
-# Empirical Strategy: Dynamic Linear Model
-Alternatively, we can rely more on the "momentum" of Redfin prices to predict Case-Shiller index.  A autogressive distributed lag model is applicable.
